@@ -122,6 +122,16 @@ class ReactAgentLoop(AgentLoopBase):
     async def run(self, sampling_params: dict[str, Any], **kwargs) -> AgentLoopOutput:
         messages = list(kwargs["raw_prompt"])
 
+        # ========== DEBUG: Print input prompt ==========
+        logger.warning("=" * 60)
+        logger.warning("🚀 AGENT LOOP START - INPUT PROMPT:")
+        for msg in messages:
+            role = msg.get("role", "unknown") if isinstance(msg, dict) else getattr(msg, "type", "unknown")
+            content = msg.get("content", "") if isinstance(msg, dict) else getattr(msg, "content", "")
+            logger.warning(f"  [{role}]: {content[:500]}...")
+        logger.warning("=" * 60)
+        # ================================================
+
         model_path = self.config.actor_rollout_ref.model.path
         model_name = "/".join(model_path.split("/")[-2:])
 
@@ -166,6 +176,25 @@ class ReactAgentLoop(AgentLoopBase):
         # https://github.com/google-gemini/gemini-fullstack-langgraph-quickstart
         try:
             state = await self.graph.ainvoke(input={"messages": messages}, config=config)
+            
+            # ========== DEBUG: Print successful trajectory ==========
+            logger.warning("=" * 60)
+            logger.warning("✅ AGENT LOOP SUCCESS - TRAJECTORY:")
+            for i, msg in enumerate(state["messages"]):
+                msg_type = getattr(msg, "type", "unknown")
+                content = getattr(msg, "content", "")[:300]
+                tool_calls = getattr(msg, "tool_calls", None)
+                if msg_type == "ai" and tool_calls:
+                    logger.warning(f"  [{i}] AI: {content}")
+                    for tc in tool_calls:
+                        logger.warning(f"       🔧 Tool Call: {tc.get('name', 'unknown')}({tc.get('args', {})})")
+                elif msg_type == "tool":
+                    logger.warning(f"  [{i}] TOOL RESULT: {content}")
+                else:
+                    logger.warning(f"  [{i}] {msg_type.upper()}: {content}")
+            logger.warning("=" * 60)
+            # =========================================================
+            
         except Exception as e:
             logger.error(f"Agent loop execution failed: {type(e).__name__}: {e}")
             logger.error("Falling back to a minimal dummy trajectory.")

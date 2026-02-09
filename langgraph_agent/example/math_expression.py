@@ -32,7 +32,14 @@ def calculate(a: int, b: int, operand: str) -> int:
 
 
 class MathExpressionReactAgentLoop(ReactAgentLoop):
+    tools = [calculate]  # Set as class attribute
+    _class_initialized = False  # Ensure each subclass has its own initialization flag
+
     @classmethod
     def init_class(cls, config, tokenizer, **kwargs):
-        cls.tools = [calculate]
-        super().init_class(config, tokenizer)
+        # Check if THIS specific class (not parent) has been initialized
+        if not cls.__dict__.get('_class_initialized', False):
+            cls._class_initialized = True
+            print(f"Performing class-level {cls.__name__} initialization")
+            # Build graph for this specific class
+            cls.graph = cls.build_graph()
