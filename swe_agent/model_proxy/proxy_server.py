@@ -95,8 +95,11 @@ class ModelProxy:
         self._server_started = False
         self._lock = asyncio.Lock()
 
-    async def start_server(self, port: Optional[int] = None, max_retries: int = 20) -> None:
+    async def start_server(self, port: Optional[int] = None, max_retries: int = 50) -> None:
         """Start the HTTP proxy server with automatic port fallback.
+
+        Uses OS-level port 0 binding as primary strategy to avoid collisions,
+        with sequential retry as fallback.
 
         Args:
             port: Optional port override. If None, uses self.port.
@@ -112,18 +115,43 @@ class ModelProxy:
             if port is not None:
                 self.port = port
 
-            # Try to bind to port, with automatic fallback to next ports
+            # Strategy 1: Let the OS pick a free port (port=0).
+            # This avoids collisions when many workers start concurrently.
+            try:
+                self.app = web.Application()
+                self.app.router.add_post("/v1/chat/completions", self._handle_chat_completion)
+                self.app.router.add_get("/health", self._handle_health)
+
+                self.runner = web.AppRunner(self.app)
+                await self.runner.setup()
+                self.site = web.TCPSite(self.runner, self.host, 0)  # port 0 = OS picks
+                await self.site.start()
+
+                # Retrieve the actual port assigned by the OS
+                sockets = self.site._server.sockets
+                if sockets:
+                    self.port = sockets[0].getsockname()[1]
+
+                self._server_started = True
+                logger.info(f"Model proxy server started on {self.host}:{self.port} (OS-assigned)")
+                return
+            except Exception as e:
+                logger.warning(f"OS port assignment failed ({e}), falling back to sequential retry")
+                # Cleanup failed attempt
+                if self.runner:
+                    await self.runner.cleanup()
+                    self.runner = None
+                self.app = None
+                self.site = None
+
+            # Strategy 2: Sequential retry from self.port upward (fallback)
             initial_port = self.port
             for attempt in range(max_retries):
                 try:
-                    # Create aiohttp application
                     self.app = web.Application()
                     self.app.router.add_post("/v1/chat/completions", self._handle_chat_completion)
-
-                    # Health check endpoint
                     self.app.router.add_get("/health", self._handle_health)
 
-                    # Setup runner and site
                     self.runner = web.AppRunner(self.app)
                     await self.runner.setup()
                     self.site = web.TCPSite(self.runner, self.host, self.port)
@@ -134,8 +162,9 @@ class ModelProxy:
                     return
 
                 except OSError as e:
-                    if e.errno == 98:  # Address already in use
-                        logger.warning(f"Port {self.port} already in use, trying port {self.port + 1}")
+                    if e.errno in (98, 48):  # 98=Linux EADDRINUSE, 48=macOS
+                        if attempt < 5 or attempt % 10 == 0:
+                            logger.warning(f"Port {self.port} already in use, trying port {self.port + 1}")
                         self.port += 1
 
                         # Cleanup failed attempt

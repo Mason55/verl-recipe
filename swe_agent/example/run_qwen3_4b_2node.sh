@@ -73,7 +73,7 @@ test_files=$DATA_DIR/test.parquet
 
 if [ ! -f "$train_files" ]; then
     echo "[ERROR] Training data not found at $train_files"
-    echo "Run: python3.12 recipe/swe_agent/prepare/prepare_data.py --mode simple --train_size 16 --test_size 4 --output_dir data/swe_agent_test"
+    echo "Run: python3.12 recipe/swe_agent/prepare/prepare_data.py --mode simple --train_size 64 --test_size 8 --output_dir data/swe_agent_test"
     exit 1
 fi
 
@@ -82,7 +82,7 @@ agent_loop_config_path=recipe/swe_agent/config/swe_agent_config.yaml
 
 # =================== wandb ===================
 project_name=swe_agent_2node
-experiment_name=qwen3-4b-swe-2node-v1
+experiment_name=qwen3-4b-swe-2node-v2-optimized
 default_local_dir=$WORK_BASE/checkpoints/$experiment_name
 
 # ================= Algorithm =================
@@ -96,17 +96,23 @@ clip_ratio_low=0.2
 clip_ratio_high=0.28
 
 # ========== Training parameters ==========
-# Scaled for 2 nodes (16 GPUs total)
-max_turns=15
+# Optimized for 2 nodes (16 GPUs total) with higher concurrency
+max_turns=8      # Reduced from 15 — most patches in 2~5 turns; cuts long-tail blocking
 max_prompt_length=4096
-max_response_length=16384
+max_response_length=8192    # Reduced from 16384 — 8 turns * ~200 tokens is enough
 actor_lr=5e-6
 
-# Batch size scaled for 2 nodes: 16 GPUs → batch_size=16
-train_batch_size=16
-ppo_mini_batch_size=8
+# Batch size: 4x per GPU → 64 total
+# Larger batch = more concurrent agent interactions = better GPU utilization
+train_batch_size=64
+ppo_mini_batch_size=16
 n_resp_per_prompt=1
 n_resp_per_prompt_val=1
+
+# Agent loop workers: match batch_size for max concurrency
+# Each worker handles batch_size/num_workers samples concurrently
+# Default is 8 (from rollout.yaml); we override to 16 for 2-node setup
+num_agent_loop_workers=16
 
 # =================== Logging ===================
 export RAY_LOGGING_LEVEL=INFO
@@ -136,8 +142,8 @@ param_offload=false
 optimizer_offload=false
 
 # ================= vLLM Memory Optimization =================
-gpu_memory_utilization=0.4
-max_model_len=16384
+gpu_memory_utilization=0.5  # Increased from 0.4 — more KV cache for concurrent requests
+max_model_len=12288         # Reduced from 16384 — 4096 prompt + 8192 response = 12288
 
 rollout_prompt_length=$max_prompt_length
 actor_max_token_len_per_gpu=$(( (max_prompt_length + max_response_length) * 2 ))
@@ -157,6 +163,7 @@ echo "  Batch size: $train_batch_size"
 echo "  Mini-batch: $ppo_mini_batch_size"
 echo "  Max turns: $max_turns"
 echo "  TP: $infer_tp, SP: $train_sp"
+echo "  Agent workers: $num_agent_loop_workers"
 echo "  NCCL_SOCKET_IFNAME: $NCCL_SOCKET_IFNAME"
 echo "=========================================="
 
@@ -242,11 +249,12 @@ ray job submit --address="${RAY_DASHBOARD}" \
     actor_rollout_ref.rollout.multi_turn.max_assistant_turns=$max_turns \
     actor_rollout_ref.rollout.multi_turn.format=hermes \
     actor_rollout_ref.rollout.agent.agent_loop_config_path=$agent_loop_config_path \
+    actor_rollout_ref.rollout.agent.num_workers=$num_agent_loop_workers \
     actor_rollout_ref.rollout.gpu_memory_utilization=$gpu_memory_utilization \
     actor_rollout_ref.rollout.prompt_length=$rollout_prompt_length \
     actor_rollout_ref.rollout.max_model_len=$max_model_len \
-    actor_rollout_ref.rollout.max_num_seqs=8 \
-    actor_rollout_ref.rollout.max_num_batched_tokens=8192 \
+    actor_rollout_ref.rollout.max_num_seqs=32 \
+    actor_rollout_ref.rollout.max_num_batched_tokens=16384 \
     actor_rollout_ref.rollout.n=$n_resp_per_prompt \
     actor_rollout_ref.rollout.val_kwargs.top_p=0.6 \
     actor_rollout_ref.rollout.val_kwargs.temperature=1.0 \
@@ -263,7 +271,7 @@ ray job submit --address="${RAY_DASHBOARD}" \
     trainer.save_freq=5 \
     trainer.default_local_dir="$default_local_dir" \
     trainer.test_freq=5 \
-    trainer.total_epochs=5
+    trainer.total_epochs=3
 
 echo ""
 echo "=========================================="

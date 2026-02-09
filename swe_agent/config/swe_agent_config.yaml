@@ -32,20 +32,22 @@
 
   # SWE-Agent execution config
   sandbox_config:
-    swe_agent_timeout: 1800 # SWE-Agent total execution time limit (seconds)
-    max_steps: 30           # Max model call count (simple tasks need 5~10 steps)
-    execution_timeout: 300  # Per-tool execution timeout (seconds)
+    swe_agent_timeout: 600  # SWE-Agent total execution time limit (seconds) — reduced from 1800
+    max_steps: 20           # Max model call count — reduced from 30 to limit long-running agents
+    execution_timeout: 120  # Per-tool execution timeout (seconds) — reduced from 300
     output_dir: ./swe_agent_outputs    # Output directory (relative to cwd; override as needed)
     python_path: python3              # Python binary (set full path if not on PATH)
-    # Max interaction turns, aborts current task when reached
-    max_turns: 15
+    # Max interaction turns — reduced from 15 to 8 to cut long-tail blocking.
+    # Most successful patches are produced in 2~5 turns; turns 8+ rarely succeed
+    # but block the entire batch waiting for the slowest sample.
+    max_turns: 8
     # deployment_type: "docker" uses Docker isolation (default, recommended for production)
     # deployment_type: "local" skips Docker containers (faster startup, for debugging only)
     deployment_type: docker
     # Docker config (only effective when deployment_type=docker)
     docker_image: swerex-python:3.11
-    docker_memory_limit: 8g
-    docker_startup_timeout: 180.0
+    docker_memory_limit: 4g  # Reduced from 8g to allow more concurrent containers per node
+    docker_startup_timeout: 120.0  # Reduced from 180 — containers should start faster
     docker_remove_container: true
 
   # Agent config - optimized for small models

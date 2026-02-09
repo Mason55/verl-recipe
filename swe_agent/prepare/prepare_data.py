@@ -96,8 +96,9 @@ def generate_simple_test_data(num_samples: int, split: str, agent_name: str = "s
         "agent_name": [],
     }
 
-    # Simple test case: file rename
+    # Diverse test cases covering different SWE skills
     test_cases = [
+        # --- File operations ---
         {
             "problem_statement": "rename 1.txt to 2.txt",
             "repo_content": {"1.txt": "Hello World"},
@@ -116,6 +117,7 @@ new file mode 100644
 @@ -0,0 +1 @@
 +print('Hello, World!')""",
         },
+        # --- Bug fixes ---
         {
             "problem_statement": "Fix the bug in calculator.py: the add function should return a + b, not a - b",
             "repo_content": {"calculator.py": "def add(a, b):\n    return a - b"},
@@ -126,6 +128,178 @@ new file mode 100644
  def add(a, b):
 -    return a - b
 +    return a + b""",
+        },
+        {
+            "problem_statement": "Fix the off-by-one error in range_sum.py: the function should include the end value",
+            "repo_content": {"range_sum.py": "def range_sum(start, end):\n    return sum(range(start, end))"},
+            "expected_patch": """diff --git a/range_sum.py b/range_sum.py
+--- a/range_sum.py
++++ b/range_sum.py
+@@ -1,2 +1,2 @@
+ def range_sum(start, end):
+-    return sum(range(start, end))
++    return sum(range(start, end + 1))""",
+        },
+        {
+            "problem_statement": "Fix the TypeError in greet.py: the function should handle None name by using 'World' as default",
+            "repo_content": {"greet.py": "def greet(name):\n    return 'Hello, ' + name + '!'"},
+            "expected_patch": """diff --git a/greet.py b/greet.py
+--- a/greet.py
++++ b/greet.py
+@@ -1,2 +1,3 @@
+-def greet(name):
++def greet(name=None):
++    name = name or 'World'
+     return 'Hello, ' + name + '!'""",
+        },
+        # --- Add functionality ---
+        {
+            "problem_statement": "Add a multiply function to math_ops.py that multiplies two numbers",
+            "repo_content": {"math_ops.py": "def add(a, b):\n    return a + b\n\ndef subtract(a, b):\n    return a - b\n"},
+            "expected_patch": """diff --git a/math_ops.py b/math_ops.py
+--- a/math_ops.py
++++ b/math_ops.py
+@@ -3,0 +4,3 @@
++def multiply(a, b):
++    return a * b
++""",
+        },
+        {
+            "problem_statement": "Add a __str__ method to the Person class in person.py that returns 'Name: {name}, Age: {age}'",
+            "repo_content": {"person.py": "class Person:\n    def __init__(self, name, age):\n        self.name = name\n        self.age = age\n"},
+            "expected_patch": """diff --git a/person.py b/person.py
+--- a/person.py
++++ b/person.py
+@@ -3,0 +4,3 @@
++    def __str__(self):
++        return f'Name: {self.name}, Age: {self.age}'
++""",
+        },
+        {
+            "problem_statement": "Add input validation to divide.py: raise ValueError when divisor is zero",
+            "repo_content": {"divide.py": "def divide(a, b):\n    return a / b\n"},
+            "expected_patch": """diff --git a/divide.py b/divide.py
+--- a/divide.py
++++ b/divide.py
+@@ -1,2 +1,4 @@
+ def divide(a, b):
++    if b == 0:
++        raise ValueError('Cannot divide by zero')
+     return a / b""",
+        },
+        # --- Refactoring ---
+        {
+            "problem_statement": "Refactor utils.py: rename the function 'calc' to 'calculate_total' for better readability",
+            "repo_content": {"utils.py": "def calc(items):\n    total = 0\n    for item in items:\n        total += item\n    return total\n"},
+            "expected_patch": """diff --git a/utils.py b/utils.py
+--- a/utils.py
++++ b/utils.py
+@@ -1,5 +1,5 @@
+-def calc(items):
++def calculate_total(items):
+     total = 0
+     for item in items:
+         total += item
+     return total""",
+        },
+        {
+            "problem_statement": "Replace the manual loop in stats.py with a list comprehension",
+            "repo_content": {"stats.py": "def get_even_numbers(numbers):\n    result = []\n    for n in numbers:\n        if n % 2 == 0:\n            result.append(n)\n    return result\n"},
+            "expected_patch": """diff --git a/stats.py b/stats.py
+--- a/stats.py
++++ b/stats.py
+@@ -1,6 +1,2 @@
+ def get_even_numbers(numbers):
+-    result = []
+-    for n in numbers:
+-        if n % 2 == 0:
+-            result.append(n)
+-    return result
++    return [n for n in numbers if n % 2 == 0]""",
+        },
+        # --- Config / text changes ---
+        {
+            "problem_statement": "Update config.py: change the DEFAULT_PORT from 8080 to 9090",
+            "repo_content": {"config.py": "DEFAULT_PORT = 8080\nDEBUG = False\nMAX_RETRIES = 3\n"},
+            "expected_patch": """diff --git a/config.py b/config.py
+--- a/config.py
++++ b/config.py
+@@ -1,3 +1,3 @@
+-DEFAULT_PORT = 8080
++DEFAULT_PORT = 9090
+ DEBUG = False
+ MAX_RETRIES = 3""",
+        },
+        {
+            "problem_statement": "Add a .gitignore file that ignores __pycache__, *.pyc, and .env files",
+            "repo_content": {"main.py": "print('hello')\n"},
+            "expected_patch": """diff --git a/.gitignore b/.gitignore
+new file mode 100644
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,3 @@
++__pycache__/
++*.pyc
++.env""",
+        },
+        # --- Multi-file awareness ---
+        {
+            "problem_statement": "Fix the import in main.py: it imports 'helper' but the function in utils.py is called 'help_func'. Rename the function in utils.py to 'helper'.",
+            "repo_content": {
+                "main.py": "from utils import helper\n\nprint(helper())\n",
+                "utils.py": "def help_func():\n    return 'I am helping'\n",
+            },
+            "expected_patch": """diff --git a/utils.py b/utils.py
+--- a/utils.py
++++ b/utils.py
+@@ -1,2 +1,2 @@
+-def help_func():
++def helper():
+     return 'I am helping'""",
+        },
+        {
+            "problem_statement": "Add a README.md file that describes the project as 'A simple Python calculator' with usage instructions showing 'python calculator.py'",
+            "repo_content": {"calculator.py": "def add(a, b):\n    return a + b\n\nif __name__ == '__main__':\n    print(add(1, 2))\n"},
+            "expected_patch": """diff --git a/README.md b/README.md
+new file mode 100644
+--- /dev/null
++++ b/README.md
+@@ -0,0 +1,5 @@
++# Calculator
++
++A simple Python calculator.
++
++Usage: `python calculator.py`""",
+        },
+        # --- Error handling ---
+        {
+            "problem_statement": "Add try-except error handling to file_reader.py: catch FileNotFoundError and print 'File not found' instead of crashing",
+            "repo_content": {"file_reader.py": "def read_file(path):\n    with open(path) as f:\n        return f.read()\n"},
+            "expected_patch": """diff --git a/file_reader.py b/file_reader.py
+--- a/file_reader.py
++++ b/file_reader.py
+@@ -1,3 +1,6 @@
+ def read_file(path):
+-    with open(path) as f:
+-        return f.read()
++    try:
++        with open(path) as f:
++            return f.read()
++    except FileNotFoundError:
++        print('File not found')
++        return None""",
+        },
+        {
+            "problem_statement": "Fix the logical error in is_palindrome.py: the function should be case-insensitive",
+            "repo_content": {"is_palindrome.py": "def is_palindrome(s):\n    return s == s[::-1]\n"},
+            "expected_patch": """diff --git a/is_palindrome.py b/is_palindrome.py
+--- a/is_palindrome.py
++++ b/is_palindrome.py
+@@ -1,2 +1,3 @@
+ def is_palindrome(s):
+-    return s == s[::-1]
++    s = s.lower()
++    return s == s[::-1]""",
         },
     ]
 

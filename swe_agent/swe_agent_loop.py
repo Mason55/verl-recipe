@@ -142,14 +142,19 @@ class SWEAgentLoop(AgentLoopBase):
 
         # Validate sandbox_config has required keys (after merging YAML + trainer config).
         # If YAML kwargs were not passed (e.g., re-instantiation by Ray), the sandbox_config
-        # may be incomplete. In that case, fall back to sensible defaults to avoid crash.
+        # may be incomplete. In that case, fall back to optimized defaults.
+        # NOTE: These defaults MUST match swe_agent_config.yaml to avoid silent divergence.
         _sandbox_defaults = {
-            "swe_agent_timeout": 1800,
-            "max_steps": 30,
-            "execution_timeout": 300,
+            "swe_agent_timeout": 600,       # 10 min (was 1800) — most tasks finish in <5 min
+            "max_steps": 20,                # (was 30) — limit long-running agents
+            "execution_timeout": 120,       # (was 300) — per-tool timeout
             "output_dir": os.path.join(os.getcwd(), "swe_agent_outputs"),
-            "max_turns": 15,
+            "max_turns": 8,                 # (was 15) — most patches in 2~5 turns
             "deployment_type": "docker",
+            "docker_image": "swerex-python:3.11",
+            "docker_memory_limit": "4g",    # (was 8g) — allows more concurrent containers
+            "docker_startup_timeout": 120.0,
+            "docker_remove_container": True,
         }
         for key, default_val in _sandbox_defaults.items():
             if key not in self.sandbox_config:

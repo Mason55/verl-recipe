@@ -249,11 +249,16 @@ You MUST run `submit` when you are done to generate the final patch."""
                 "type": "docker",
                 "image": self.docker_image,
                 "docker_args": [
+                    # --rm: auto-remove container when it stops (safety net for abnormal exits)
+                    "--rm",
                     f"--memory={self.docker_memory_limit}",
                     # Use host.docker.internal to access host services (like ModelProxy)
                     # This avoids --network=host which causes port conflicts between containers
                     "--add-host",
                     "host.docker.internal:host-gateway",
+                    # Label for tracking — allows cleanup by instance_id when SWE-Agent crashes
+                    "--label",
+                    f"verl.instance_id={self.instance_id}",
                 ],
                 "startup_timeout": self.docker_startup_timeout,
                 "remove_container": self.docker_remove_container,
