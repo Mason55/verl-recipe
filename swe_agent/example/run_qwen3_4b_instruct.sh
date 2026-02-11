@@ -74,9 +74,9 @@ clip_ratio_low=0.2
 clip_ratio_high=0.28
 
 # ========== Training parameters ==========
-max_turns=15              # Give agent enough turns to complete task+submit (incl. ~5 format retries)
+max_turns=5               # Simple test tasks need 2-4 turns; 5 allows margin for format retries
 max_prompt_length=4096    # Actual prompt ~300 tokens, but padding upper bound needs headroom
-max_response_length=16384 # Multi-turn dialogue accumulates long responses (incl. retries), 16k reduces truncation
+max_response_length=4096  # With max_turns=5 and avg ~200 tokens/turn, 4k is sufficient for simple tasks
 actor_lr=5e-6             # GRPO typically needs higher LR than PPO to learn signal
 
 train_batch_size=${TRAIN_BATCH_SIZE:-8}   # Should match agent_loop_workers count
@@ -92,10 +92,22 @@ export HYDRA_FULL_ERROR=1
 export NCCL_DEBUG=WARN
 export VLLM_USE_V1=1
 export VLLM_ATTENTION_BACKEND=FLASH_ATTN
-# Fix /dev/shm space issue - use alternative communication methods
-export NCCL_SHM_DISABLE=1
-export NCCL_P2P_DISABLE=1
-export NCCL_SOCKET_IFNAME=lo
+
+# NCCL communication settings — auto-configure based on single vs multi-node.
+# Single-node: use fast SHM + P2P (NVLink/PCIe) for GPU communication.
+# Multi-node: use RDMA/IB or TCP sockets; set IFNAME to physical NIC.
+if [ "$NNODES" -gt 1 ]; then
+    # Multi-node: use physical NIC for cross-node communication
+    export NCCL_SOCKET_IFNAME=${NCCL_SOCKET_IFNAME:-enp96s0f0}
+    # Uncomment below ONLY if /dev/shm is too small on worker nodes:
+    # export NCCL_SHM_DISABLE=1
+else
+    # Single-node: enable all fast paths (SHM + P2P)
+    # /dev/shm is 32GB on this machine, no need to disable
+    unset NCCL_SHM_DISABLE 2>/dev/null || true
+    unset NCCL_P2P_DISABLE 2>/dev/null || true
+    unset NCCL_SOCKET_IFNAME 2>/dev/null || true
+fi
 
 # Key optimization: use all GPUs for TP/SP to distribute memory pressure
 infer_tp=8  # vLLM tensor parallel - use all 8 GPUs to reduce per-GPU memory
@@ -109,10 +121,12 @@ optimizer_offload=false
 
 # ================= vLLM Memory Optimization =================
 # In async mode, actor model is initialized first, leaving limited free memory.
-# vLLM must fit in remaining space. Use conservative settings.
-gpu_memory_utilization=0.4   # Per-GPU 24GB, training peak ~13.5GB, vLLM can use ~40%
+# vLLM must fit in remaining space.
+gpu_memory_utilization=0.5   # Raised from 0.4: more KV cache for concurrent requests (watch for OOM)
 # max_model_len: vLLM max sequence length, must be >= prompt + response generation length
-max_model_len=16384          # 16k supports longer multi-turn interactions
+# For simple test tasks (avg response ~300 tokens), 4096 is sufficient and saves KV cache memory.
+# Increase to 16384 for complex SWE-bench tasks with long multi-turn interactions.
+max_model_len=4096
 
 # prompt_length is used for rollout padding, must be <= max_model_len
 # actor_max_token_len_per_gpu must be >= (prompt_length + response_length)
@@ -175,8 +189,8 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.gpu_memory_utilization=$gpu_memory_utilization \
     actor_rollout_ref.rollout.prompt_length=$rollout_prompt_length \
     actor_rollout_ref.rollout.max_model_len=$max_model_len \
-    actor_rollout_ref.rollout.max_num_seqs=8 \
-    actor_rollout_ref.rollout.max_num_batched_tokens=8192 \
+    actor_rollout_ref.rollout.max_num_seqs=16 \
+    actor_rollout_ref.rollout.max_num_batched_tokens=16384 \
     actor_rollout_ref.rollout.n=$n_resp_per_prompt \
     actor_rollout_ref.rollout.val_kwargs.top_p=0.6 \
     actor_rollout_ref.rollout.val_kwargs.temperature=1.0 \

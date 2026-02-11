@@ -49,7 +49,7 @@
   sandbox_config:
     # --- Infrastructure fields (fixed per deployment) ---
     swe_agent_timeout: 1800 # SWE-Agent total execution time limit (seconds)
-    execution_timeout: 300  # Per-tool execution timeout (seconds)
+    execution_timeout: 60   # Per-tool execution timeout (seconds); lowered from 300s to fail fast on install.sh hangs
     output_dir: ./swe_agent_outputs    # Output directory (relative to cwd; override as needed)
     docker_memory_limit: 8g
     docker_startup_timeout: 180.0
@@ -62,7 +62,7 @@
     max_turns: 15
     # [DATA-AFFINE] Docker image - different repos need different Python versions/dependencies
     # SWE-bench instances map to specific images; override via extra_info.sandbox_overrides.docker_image
-    docker_image: swerex-python:3.11
+    docker_image: swerex-python:3.11-preinstalled  # Pre-installed tree-sitter; eliminates install.sh timeout
 
   # Agent config - optimized for small models
   agent:

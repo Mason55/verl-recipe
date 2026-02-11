@@ -231,7 +231,7 @@ class SWEAgentRuntimeConfig:
 
     # --- Sandbox (infrastructure) ---
     swe_agent_timeout: int = 1800
-    execution_timeout: int = 300
+    execution_timeout: int = 60
     output_dir: str = ""
     docker_memory_limit: str = "8g"
     docker_startup_timeout: float = 180.0
@@ -240,7 +240,7 @@ class SWEAgentRuntimeConfig:
     # --- Sandbox (data-affine) ---
     max_steps: int = 30
     max_turns: int = 15
-    docker_image: str = "swerex-python:3.11"
+    docker_image: str = "swerex-python:3.11-preinstalled"
 
     # --- Agent (data-affine) ---
     templates: dict[str, Any] = field(default_factory=dict)
@@ -304,7 +304,7 @@ def build_runtime_config(yaml_kwargs: dict[str, Any]) -> SWEAgentRuntimeConfig:
         # Sandbox — data-affine
         max_steps=int(yaml_sandbox.get("max_steps", 30)),
         max_turns=int(yaml_sandbox.get("max_turns", 15)),
-        docker_image=str(yaml_sandbox.get("docker_image", "swerex-python:3.11")),
+        docker_image=str(yaml_sandbox.get("docker_image", "swerex-python:3.11-preinstalled")),
         # Agent — data-affine
         templates=dict(templates),
         tool_bundles=yaml_tools.get("bundles", deepcopy(_DEFAULT_TOOL_BUNDLES)),
