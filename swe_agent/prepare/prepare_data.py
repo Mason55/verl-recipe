@@ -172,11 +172,16 @@ def load_swebench_lite(
         sandbox_overrides: dict[str, Any] = {}
         if item.get("docker_image"):
             sandbox_overrides["docker_image"] = item["docker_image"]
+            # SWE-bench eval images have repos pre-installed at /testbed
+            sandbox_overrides["use_preexisting_repo"] = True
+            sandbox_overrides["preexisting_repo_name"] = "testbed"
+            sandbox_overrides["preexisting_repo_reset"] = True
         if item.get("max_steps"):
             sandbox_overrides["max_steps"] = item["max_steps"]
 
         # Per-instance agent overrides (templates)
-        agent_overrides: dict[str, Any] = {}
+        # NOTE: Always include a placeholder to avoid pyarrow empty-struct error
+        agent_overrides: dict[str, Any] = {"_placeholder": True}
         if item.get("system_template"):
             agent_overrides.setdefault("templates", {})["system_template"] = item["system_template"]
         if item.get("instance_template"):
@@ -185,13 +190,14 @@ def load_swebench_lite(
         rows.append(
             {
                 "prompt": _make_minimal_prompt(problem_statement),
-                "data_source": "swe_bench_lite",
+                "data_source": "swe_bench_verified",
                 "ability": "software_engineering",
                 "reward_model": {
                     "style": "swe_bench",
                     "instance_id": instance_id,
                     "test_patch": item.get("test_patch", ""),
                     "gold_patch": item.get("patch", ""),
+                    "ground_truth": {"gold_patch": item.get("patch", "")},
                 },
                 "extra_info": {
                     "index": idx,

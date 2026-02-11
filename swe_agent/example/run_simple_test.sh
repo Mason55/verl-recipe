@@ -1,151 +1,137 @@
 #!/usr/bin/env bash
 # =============================================================================
-# SWE Agent VERL Training Script - Quick Test Version
+# SWE-Agent Simple Test Training
 #
-# Quick test version based on run_qwen3_4b_instaruction.sh
-# Uses small data to verify the refactored code works correctly
+# Self-contained script: generates synthetic data and launches FSDP training.
+# Designed for quick validation on a single node (e.g. 8× RTX 3090).
+#
+# Usage:
+#   bash run_simple_test.sh                          # default: 10 epochs
+#   bash run_simple_test.sh trainer.total_epochs=2   # quick 2-epoch run
+#
+# Key hyperparameters (override via environment or Hydra CLI):
+#   MODEL_PATH       Model directory         (default: Qwen3-4B-Instruct-2507)
+#   WORK_BASE        Workspace root          (default: /data1/lmy/workspace)
+#   TRAIN_BATCH_SIZE Prompts per rollout      (default: 8)
+#   GPUS_PER_NODE    Number of GPUs           (default: 8)
 # =============================================================================
 
 set -xeuo pipefail
 
 # ================= Work directories =================
-# [CONFIGURE] Set WORK_BASE to control where all cache/tmp/checkpoint files go.
-# Override with: export WORK_BASE=/your/path before running this script.
 WORK_BASE=${WORK_BASE:-/data1/lmy/workspace}
-export TMPDIR=$WORK_BASE/tmp
-export TEMP=$WORK_BASE/tmp
-export TMP=$WORK_BASE/tmp
+export TMPDIR=$WORK_BASE/tmp  TEMP=$WORK_BASE/tmp  TMP=$WORK_BASE/tmp
 export RAY_TMPDIR=$WORK_BASE/ray_tmp
 export TRITON_CACHE_DIR=$WORK_BASE/triton_cache
 export TORCH_EXTENSIONS_DIR=$WORK_BASE/torch_extensions
 export HF_HOME=$WORK_BASE/hf_cache
 export XDG_CACHE_HOME=$WORK_BASE/cache
-mkdir -p $TMPDIR $RAY_TMPDIR $TRITON_CACHE_DIR $TORCH_EXTENSIONS_DIR $HF_HOME $XDG_CACHE_HOME
+mkdir -p "$TMPDIR" "$RAY_TMPDIR" "$TRITON_CACHE_DIR" "$TORCH_EXTENSIONS_DIR" "$HF_HOME" "$XDG_CACHE_HOME"
 
-# ================= cluster topology =================
+# ================= Cluster topology =================
 export GPUS_PER_NODE=${GPUS_PER_NODE:-8}
 export NNODES=${NNODES:-1}
 export RAY_NUM_NODES=$NNODES
 
-echo "=========================================="
-echo "SWE Agent Quick Test - Using run_qwen3_4b.sh Config"
-echo "=========================================="
-echo "==========================================="
-echo "Using $NNODES nodes and $GPUS_PER_NODE GPUs per node..."
-echo "==========================================="
-
-# ================= paths =================
+# ================= Paths =================
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RECIPE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 VERL_ROOT="$(cd "$RECIPE_DIR/../.." && pwd)"
 
-# ========== Model config ==========
-# [CONFIGURE] Set MODEL_PATH to your local model directory or HuggingFace model id.
-# e.g. export MODEL_PATH=/data/models/Qwen/Qwen3-4B-Instruct-2507
 model_path=${MODEL_PATH:-/data1/models/Qwen/Qwen3-4B-Instruct-2507}
 
-# ========== Test data config (using small dataset) ==========
+# ================= Data =================
 DATA_DIR=$VERL_ROOT/data/swe_agent_test
 train_files=$DATA_DIR/train.parquet
 test_files=$DATA_DIR/test.parquet
 
 if [ ! -f "$train_files" ]; then
-    echo "[ERROR] Test data not found at $train_files"
-    echo "Run: python3 recipe/swe_agent/prepare/prepare_data.py --mode simple --train_size 8 --test_size 2 --output_dir data/swe_agent_test"
-    exit 1
+    echo "[INFO] Generating synthetic test data..."
+    python3 "$RECIPE_DIR/prepare/prepare_data.py" \
+        --mode simple --train_size 8 --test_size 2 \
+        --output_dir "$DATA_DIR"
 fi
 
-# ========== Agent Loop config ==========
+# ================= Experiment =================
 agent_loop_config_path=recipe/swe_agent/config/swe_agent_config.yaml
-
-# =================== wandb ===================
 project_name=swe_agent_test
-experiment_name=qwen3-4b-swe-train-v1
+experiment_name=${EXPERIMENT_NAME:-qwen3-4b-simple-v1}
 default_local_dir=$WORK_BASE/checkpoints/$experiment_name
 
-# ================= algorithm =================
+rollout_data_dir=$WORK_BASE/trajectories/$experiment_name/rollout
+validation_data_dir=$WORK_BASE/trajectories/$experiment_name/validation
+mkdir -p "$rollout_data_dir" "$validation_data_dir"
+
+export VERL_FILE_LOGGER_PATH=$WORK_BASE/logs/${experiment_name}_metrics.jsonl
+mkdir -p "$(dirname "$VERL_FILE_LOGGER_PATH")"
+
+# ================= Algorithm =================
 adv_estimator=grpo
 use_kl_in_reward=false
 kl_coef=0.0
-use_kl_loss=false
-kl_loss_coef=0.0
+use_kl_loss=true
+kl_loss_coef=0.001
+clip_ratio_low=0.1
+clip_ratio_high=0.15
 
-clip_ratio_low=0.2
-clip_ratio_high=0.28
+# ================= Training parameters =================
+max_turns=5
+max_prompt_length=4096
+max_response_length=4096
+actor_lr=5e-6
+ppo_epochs=4
 
-# ========== Training parameters ==========
-max_turns=5               # Simple test tasks need 2-4 turns; 5 allows margin for format retries
-max_prompt_length=4096    # Actual prompt ~300 tokens, but padding upper bound needs headroom
-max_response_length=4096  # With max_turns=5 and avg ~200 tokens/turn, 4k is sufficient for simple tasks
-actor_lr=5e-6             # GRPO typically needs higher LR than PPO to learn signal
-
-train_batch_size=${TRAIN_BATCH_SIZE:-8}   # Should match agent_loop_workers count
-ppo_mini_batch_size=${PPO_MINI_BATCH_SIZE:-4}  # mini_batch < batch: multiple gradient updates per step
-n_resp_per_prompt=1
+train_batch_size=${TRAIN_BATCH_SIZE:-8}
+ppo_mini_batch_size=${PPO_MINI_BATCH_SIZE:-4}
+n_resp_per_prompt=${N_RESP_PER_PROMPT:-4}
 n_resp_per_prompt_val=1
 
-# =================== logging ===================
+# ================= Logging =================
 export RAY_LOGGING_LEVEL=INFO
 export HYDRA_FULL_ERROR=1
 
-# ================= performance =================
+# ================= Performance =================
 export NCCL_DEBUG=WARN
 export VLLM_USE_V1=1
 export VLLM_ATTENTION_BACKEND=FLASH_ATTN
 
-# NCCL communication settings — auto-configure based on single vs multi-node.
-# Single-node: use fast SHM + P2P (NVLink/PCIe) for GPU communication.
-# Multi-node: use RDMA/IB or TCP sockets; set IFNAME to physical NIC.
 if [ "$NNODES" -gt 1 ]; then
-    # Multi-node: use physical NIC for cross-node communication
     export NCCL_SOCKET_IFNAME=${NCCL_SOCKET_IFNAME:-enp96s0f0}
-    # Uncomment below ONLY if /dev/shm is too small on worker nodes:
-    # export NCCL_SHM_DISABLE=1
 else
-    # Single-node: enable all fast paths (SHM + P2P)
-    # /dev/shm is 32GB on this machine, no need to disable
     unset NCCL_SHM_DISABLE 2>/dev/null || true
     unset NCCL_P2P_DISABLE 2>/dev/null || true
     unset NCCL_SOCKET_IFNAME 2>/dev/null || true
 fi
 
-# Key optimization: use all GPUs for TP/SP to distribute memory pressure
-infer_tp=8  # vLLM tensor parallel - use all 8 GPUs to reduce per-GPU memory
-train_sp=8  # Ulysses sequence parallel - must match GPU count
+# ================= Parallelism =================
+infer_tp=$GPUS_PER_NODE
+train_sp=$GPUS_PER_NODE
 
-# ================= FSDP Optimization =================
+# ================= FSDP =================
 fsdp_strategy=fsdp2
 offload_policy=true
 param_offload=false
 optimizer_offload=false
 
-# ================= vLLM Memory Optimization =================
-# In async mode, actor model is initialized first, leaving limited free memory.
-# vLLM must fit in remaining space.
-gpu_memory_utilization=0.5   # Raised from 0.4: more KV cache for concurrent requests (watch for OOM)
-# max_model_len: vLLM max sequence length, must be >= prompt + response generation length
-# For simple test tasks (avg response ~300 tokens), 4096 is sufficient and saves KV cache memory.
-# Increase to 16384 for complex SWE-bench tasks with long multi-turn interactions.
+# ================= vLLM =================
+gpu_memory_utilization=0.5
 max_model_len=4096
-
-# prompt_length is used for rollout padding, must be <= max_model_len
-# actor_max_token_len_per_gpu must be >= (prompt_length + response_length)
 rollout_prompt_length=$max_prompt_length
-actor_max_token_len_per_gpu=$(( (max_prompt_length + max_response_length) * 2 ))   # = 24576
-log_prob_max_token_len_per_gpu=$(( actor_max_token_len_per_gpu * 2 ))              # = 49152
+actor_max_token_len_per_gpu=$(( (max_prompt_length + max_response_length) * n_resp_per_prompt ))
+log_prob_max_token_len_per_gpu=$(( actor_max_token_len_per_gpu * 2 ))
 
 train_files="['$train_files']"
 test_files="['$test_files']"
 
 echo "=========================================="
-echo "Configuration:"
-echo "  Model: $model_path"
-echo "  Train data: $train_files"
-echo "  Test data: $test_files"
-echo "  Agent config: $agent_loop_config_path"
-echo "  Max turns: $max_turns"
-echo "  Batch size: $train_batch_size"
-echo "  TP: $infer_tp, SP: $train_sp"
+echo "SWE-Agent Simple Test Training"
+echo "  Model:              $model_path"
+echo "  Experiment:         $experiment_name"
+echo "  GPUs:               $GPUS_PER_NODE × $NNODES node(s)"
+echo "  batch / n_resp:     $train_batch_size × $n_resp_per_prompt"
+echo "  ppo_epochs:         $ppo_epochs"
+echo "  actor_lr:           $actor_lr"
+echo "  TP=$infer_tp  SP=$train_sp"
 echo "=========================================="
 
 python3 -m verl.trainer.main_ppo \
@@ -171,6 +157,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.actor.clip_ratio_c=10.0 \
     actor_rollout_ref.actor.optim.lr=$actor_lr \
     actor_rollout_ref.actor.use_dynamic_bsz=true \
+    actor_rollout_ref.actor.ppo_epochs=$ppo_epochs \
     actor_rollout_ref.actor.ppo_mini_batch_size=$ppo_mini_batch_size \
     actor_rollout_ref.actor.ppo_max_token_len_per_gpu=$actor_max_token_len_per_gpu \
     actor_rollout_ref.actor.ulysses_sequence_parallel_size=$train_sp \
@@ -197,14 +184,16 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.val_kwargs.n=$n_resp_per_prompt_val \
     custom_reward_function.path="${RECIPE_DIR}/reward/reward.py" \
     custom_reward_function.name=compute_score \
-    trainer.logger='["console"]' \
+    trainer.logger='["console","file"]' \
     trainer.project_name=$project_name \
     trainer.experiment_name=$experiment_name \
     trainer.n_gpus_per_node="$GPUS_PER_NODE" \
-    trainer.val_before_train=false \
+    trainer.val_before_train=true \
     trainer.log_val_generations=10 \
     trainer.nnodes="$NNODES" \
-    trainer.save_freq=5 \
+    trainer.save_freq=999 \
     trainer.default_local_dir="$default_local_dir" \
-    trainer.test_freq=5 \
-    trainer.total_epochs=2 "$@"
+    trainer.test_freq=2 \
+    trainer.total_epochs=10 \
+    trainer.rollout_data_dir="$rollout_data_dir" \
+    trainer.validation_data_dir="$validation_data_dir" "$@"
