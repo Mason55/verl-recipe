@@ -45,10 +45,12 @@ DATA_DIR=$VERL_ROOT/data/swe_agent_test
 train_files=$DATA_DIR/train.parquet
 test_files=$DATA_DIR/test.parquet
 
+train_size=${TRAIN_SIZE:-12}
+test_size=${TEST_SIZE:-4}
 if [ ! -f "$train_files" ]; then
-    echo "[INFO] Generating synthetic test data..."
+    echo "[INFO] Generating synthetic test data (train=$train_size, test=$test_size)..."
     python3 "$RECIPE_DIR/prepare/prepare_data.py" \
-        --mode simple --train_size 8 --test_size 2 \
+        --mode simple --train_size "$train_size" --test_size "$test_size" \
         --output_dir "$DATA_DIR"
 fi
 

@@ -72,49 +72,219 @@ def _make_minimal_prompt(problem_statement: str) -> list[dict[str, str]]:
 # ---------------------------------------------------------------------------
 
 
+_SIMPLE_CASES_TRAIN = [
+    {
+        "problem_statement": "rename 1.txt to 2.txt",
+        "repo_content": {"1.txt": "Hello World"},
+        "expected_patch": "diff --git a/1.txt b/2.txt\nsimilarity index 100%\nrename from 1.txt\nrename to 2.txt",
+    },
+    {
+        "problem_statement": "Create a new file called hello.py that prints 'Hello, World!'",
+        "repo_content": {},
+        "expected_patch": (
+            "diff --git a/hello.py b/hello.py\n"
+            "new file mode 100644\n"
+            "--- /dev/null\n"
+            "+++ b/hello.py\n"
+            "@@ -0,0 +1 @@\n"
+            "+print('Hello, World!')"
+        ),
+    },
+    {
+        "problem_statement": "Fix the bug in calculator.py: the add function should return a + b, not a - b",
+        "repo_content": {"calculator.py": "def add(a, b):\n    return a - b"},
+        "expected_patch": (
+            "diff --git a/calculator.py b/calculator.py\n"
+            "--- a/calculator.py\n"
+            "+++ b/calculator.py\n"
+            "@@ -1,2 +1,2 @@\n"
+            " def add(a, b):\n"
+            "-    return a - b\n"
+            "+    return a + b"
+        ),
+    },
+    {
+        "problem_statement": "Delete the file named remove_me.txt from the repository",
+        "repo_content": {"remove_me.txt": "This file should be deleted", "keep.txt": "Keep this"},
+        "expected_patch": (
+            "diff --git a/remove_me.txt b/remove_me.txt\n"
+            "deleted file mode 100644\n"
+            "--- a/remove_me.txt\n"
+            "+++ /dev/null\n"
+            "@@ -1 +0,0 @@\n"
+            "-This file should be deleted"
+        ),
+    },
+    {
+        "problem_statement": "Add a docstring to the function greet in greet.py. The docstring should say 'Return a greeting message.'",
+        "repo_content": {"greet.py": 'def greet(name):\n    return f"Hello, {name}!"'},
+        "expected_patch": (
+            "diff --git a/greet.py b/greet.py\n"
+            "--- a/greet.py\n"
+            "+++ b/greet.py\n"
+            "@@ -1,2 +1,3 @@\n"
+            " def greet(name):\n"
+            '+    """Return a greeting message."""\n'
+            '     return f"Hello, {name}!"'
+        ),
+    },
+    {
+        "problem_statement": "Fix the off-by-one error in range.py: the loop should print numbers from 1 to 5 inclusive, not 1 to 4",
+        "repo_content": {"range.py": "for i in range(1, 5):\n    print(i)"},
+        "expected_patch": (
+            "diff --git a/range.py b/range.py\n"
+            "--- a/range.py\n"
+            "+++ b/range.py\n"
+            "@@ -1,2 +1,2 @@\n"
+            "-for i in range(1, 5):\n"
+            "+for i in range(1, 6):\n"
+            "     print(i)"
+        ),
+    },
+    {
+        "problem_statement": "Create a file called config.json with the content: {\"debug\": true, \"version\": 1}",
+        "repo_content": {},
+        "expected_patch": (
+            "diff --git a/config.json b/config.json\n"
+            "new file mode 100644\n"
+            "--- /dev/null\n"
+            "+++ b/config.json\n"
+            "@@ -0,0 +1 @@\n"
+            '+{"debug": true, "version": 1}'
+        ),
+    },
+    {
+        "problem_statement": "In math_utils.py, the multiply function incorrectly uses addition. Fix it to use multiplication.",
+        "repo_content": {"math_utils.py": "def multiply(a, b):\n    return a + b\n\ndef divide(a, b):\n    return a / b"},
+        "expected_patch": (
+            "diff --git a/math_utils.py b/math_utils.py\n"
+            "--- a/math_utils.py\n"
+            "+++ b/math_utils.py\n"
+            "@@ -1,2 +1,2 @@\n"
+            " def multiply(a, b):\n"
+            "-    return a + b\n"
+            "+    return a * b"
+        ),
+    },
+    {
+        "problem_statement": "Move the file old_dir/data.csv to new_dir/data.csv (create new_dir if it does not exist)",
+        "repo_content": {"old_dir/data.csv": "name,value\nalice,100\nbob,200"},
+        "expected_patch": (
+            "diff --git a/old_dir/data.csv b/new_dir/data.csv\n"
+            "similarity index 100%\n"
+            "rename from old_dir/data.csv\n"
+            "rename to new_dir/data.csv"
+        ),
+    },
+    {
+        "problem_statement": "Replace all occurrences of 'foo' with 'bar' in replace_me.txt",
+        "repo_content": {"replace_me.txt": "foo is great\nI love foo\nfoo foo foo"},
+        "expected_patch": (
+            "diff --git a/replace_me.txt b/replace_me.txt\n"
+            "--- a/replace_me.txt\n"
+            "+++ b/replace_me.txt\n"
+            "@@ -1,3 +1,3 @@\n"
+            "-foo is great\n"
+            "-I love foo\n"
+            "-foo foo foo\n"
+            "+bar is great\n"
+            "+I love bar\n"
+            "+bar bar bar"
+        ),
+    },
+    {
+        "problem_statement": "Add a shebang line (#!/usr/bin/env python3) at the top of script.py",
+        "repo_content": {"script.py": "import sys\nprint(sys.argv)"},
+        "expected_patch": (
+            "diff --git a/script.py b/script.py\n"
+            "--- a/script.py\n"
+            "+++ b/script.py\n"
+            "@@ -1,2 +1,3 @@\n"
+            "+#!/usr/bin/env python3\n"
+            " import sys\n"
+            " print(sys.argv)"
+        ),
+    },
+    {
+        "problem_statement": "Fix the syntax error in broken.py: there is a missing colon after 'if True'",
+        "repo_content": {"broken.py": "if True\n    print('works')"},
+        "expected_patch": (
+            "diff --git a/broken.py b/broken.py\n"
+            "--- a/broken.py\n"
+            "+++ b/broken.py\n"
+            "@@ -1,2 +1,2 @@\n"
+            "-if True\n"
+            "+if True:\n"
+            "     print('works')"
+        ),
+    },
+]
+
+_SIMPLE_CASES_VAL = [
+    {
+        "problem_statement": "Rename the file report.txt to summary.txt",
+        "repo_content": {"report.txt": "Quarterly earnings report"},
+        "expected_patch": (
+            "diff --git a/report.txt b/summary.txt\n"
+            "similarity index 100%\n"
+            "rename from report.txt\n"
+            "rename to summary.txt"
+        ),
+    },
+    {
+        "problem_statement": "Create a new file called goodbye.py that prints 'Goodbye, World!'",
+        "repo_content": {},
+        "expected_patch": (
+            "diff --git a/goodbye.py b/goodbye.py\n"
+            "new file mode 100644\n"
+            "--- /dev/null\n"
+            "+++ b/goodbye.py\n"
+            "@@ -0,0 +1 @@\n"
+            "+print('Goodbye, World!')"
+        ),
+    },
+    {
+        "problem_statement": "Fix the bug in subtract.py: the subtract function should return a - b, not a + b",
+        "repo_content": {"subtract.py": "def subtract(a, b):\n    return a + b"},
+        "expected_patch": (
+            "diff --git a/subtract.py b/subtract.py\n"
+            "--- a/subtract.py\n"
+            "+++ b/subtract.py\n"
+            "@@ -1,2 +1,2 @@\n"
+            " def subtract(a, b):\n"
+            "-    return a + b\n"
+            "+    return a - b"
+        ),
+    },
+    {
+        "problem_statement": "Delete the file temp.log from the repository",
+        "repo_content": {"temp.log": "DEBUG: old log entries", "app.py": "print('app')"},
+        "expected_patch": (
+            "diff --git a/temp.log b/temp.log\n"
+            "deleted file mode 100644\n"
+            "--- a/temp.log\n"
+            "+++ /dev/null\n"
+            "@@ -1 +0,0 @@\n"
+            "-DEBUG: old log entries"
+        ),
+    },
+]
+
+
 def generate_simple_test_data(
     num_samples: int,
     split: str,
     agent_name: str = "swe_agent",
 ) -> pd.DataFrame:
-    """Generate simple test data for quick validation."""
+    """Generate simple test data for quick validation.
 
-    test_cases = [
-        {
-            "problem_statement": "rename 1.txt to 2.txt",
-            "repo_content": {"1.txt": "Hello World"},
-            "expected_patch": ("diff --git a/1.txt b/2.txt\nsimilarity index 100%\nrename from 1.txt\nrename to 2.txt"),
-        },
-        {
-            "problem_statement": "Create a new file called hello.py that prints 'Hello, World!'",
-            "repo_content": {},
-            "expected_patch": (
-                "diff --git a/hello.py b/hello.py\n"
-                "new file mode 100644\n"
-                "--- /dev/null\n"
-                "+++ b/hello.py\n"
-                "@@ -0,0 +1 @@\n"
-                "+print('Hello, World!')"
-            ),
-        },
-        {
-            "problem_statement": ("Fix the bug in calculator.py: the add function should return a + b, not a - b"),
-            "repo_content": {"calculator.py": "def add(a, b):\n    return a - b"},
-            "expected_patch": (
-                "diff --git a/calculator.py b/calculator.py\n"
-                "--- a/calculator.py\n"
-                "+++ b/calculator.py\n"
-                "@@ -1,2 +1,2 @@\n"
-                " def add(a, b):\n"
-                "-    return a - b\n"
-                "+    return a + b"
-            ),
-        },
-    ]
+    Train and validation use completely disjoint problem pools.
+    """
+    pool = _SIMPLE_CASES_TRAIN if split == "train" else _SIMPLE_CASES_VAL
 
     rows: list[dict[str, Any]] = []
     for idx in range(num_samples):
-        case = test_cases[idx % len(test_cases)]
+        case = pool[idx % len(pool)]
         rows.append(
             {
                 "prompt": _make_minimal_prompt(case["problem_statement"]),
@@ -130,7 +300,6 @@ def generate_simple_test_data(
                     "repo_content": case["repo_content"],
                     "expected_patch": case["expected_patch"],
                     "problem_statement": case["problem_statement"],
-                    # Data-affine overrides — simple tasks use smaller limits.
                     "sandbox_overrides": {"max_steps": 10, "max_turns": 8},
                 },
                 "agent_name": agent_name,
