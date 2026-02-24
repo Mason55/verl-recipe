@@ -246,6 +246,8 @@ class SWEAgentRuntimeConfig:
     docker_memory_limit: str = "8g"
     docker_startup_timeout: float = 180.0
     docker_remove_container: bool = True
+    docker_internal_host: str = "http://127.0.0.1"
+    docker_network: str = ""
 
     # --- Sandbox (data-affine) ---
     max_steps: int = 30
@@ -312,6 +314,8 @@ def build_runtime_config(yaml_kwargs: dict[str, Any]) -> SWEAgentRuntimeConfig:
         docker_memory_limit=str(yaml_sandbox.get("docker_memory_limit", "8g")),
         docker_startup_timeout=float(yaml_sandbox.get("docker_startup_timeout", 180.0)),
         docker_remove_container=_to_bool(yaml_sandbox.get("docker_remove_container", True), True),
+        docker_internal_host=str(yaml_sandbox.get("docker_internal_host", "http://127.0.0.1")),
+        docker_network=str(yaml_sandbox.get("docker_network", "")),
         # Sandbox — data-affine
         max_steps=int(yaml_sandbox.get("max_steps", 30)),
         max_turns=int(yaml_sandbox.get("max_turns", 15)),
@@ -529,6 +533,8 @@ class SWEAgentYAMLBuilder:
                     ],
                     "startup_timeout": cfg.docker_startup_timeout,
                     "remove_container": cfg.docker_remove_container,
+                    "docker_internal_host": cfg.docker_internal_host,
+                    "docker_network": cfg.docker_network,
                 },
                 "name": f"verl-swe-{self._id}",
             },
