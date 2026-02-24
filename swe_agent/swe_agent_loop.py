@@ -247,6 +247,10 @@ class SWEAgentLoop(AgentLoopBase):
             )
 
             # ── 6. Interaction loop ──
+            # Use problem_instance_id (or a fresh UUID) as sticky session key
+            # so that all turns route to the same vLLM replica for prefix
+            # KV-cache reuse and implicit load-balancing via the server manager.
+            session_id = problem_instance_id if problem_instance_id else str(uuid.uuid4())
             (
                 patch,
                 num_turns,
@@ -260,6 +264,7 @@ class SWEAgentLoop(AgentLoopBase):
                 max_turns=run_cfg.max_turns,
                 request_timeout=run_cfg.proxy_timeout,
                 model_proxy=model_proxy,
+                session_id=session_id,
             )
 
             # ── 7. Drain agent task ──
@@ -310,6 +315,7 @@ class SWEAgentLoop(AgentLoopBase):
         max_turns: int,
         request_timeout: float,
         model_proxy: ModelProxy,
+        session_id: Optional[str] = None,
     ) -> tuple[
         Optional[str],  # patch
         int,  # num_turns
@@ -318,7 +324,15 @@ class SWEAgentLoop(AgentLoopBase):
         list[int],  # all_response_mask
         list[float],  # all_response_logprobs
     ]:
-        """Run the main turn-by-turn interaction with SWE-Agent via ModelProxy."""
+        """Run the main turn-by-turn interaction with SWE-Agent via ModelProxy.
+
+        Args:
+            session_id: Sticky session identifier.  When provided, every
+                ``server_manager.generate()`` call within this episode uses
+                the *same* ``request_id`` so that
+                :class:`AsyncLLMServerManager` routes all turns to the same
+                vLLM replica, maximising prefix KV-cache reuse.
+        """
         initial_prompt_ids: Optional[list[int]] = None
         all_response_ids: list[int] = []
         all_response_mask: list[int] = []
@@ -326,6 +340,10 @@ class SWEAgentLoop(AgentLoopBase):
         prev_messages: Optional[list[dict]] = None
         num_turns = 0
         patch: Optional[str] = None
+
+        # Use a fixed session_id for sticky routing & prefix cache reuse.
+        if session_id is None:
+            session_id = str(uuid.uuid4())
 
         while True:
             # Pre-check: agent already done?
@@ -395,9 +413,9 @@ class SWEAgentLoop(AgentLoopBase):
             if initial_prompt_ids is None:
                 initial_prompt_ids = prompt_ids
 
-            # Generate
+            # Generate — use fixed session_id for sticky routing & prefix cache
             output = await self.server_manager.generate(
-                request_id=str(uuid.uuid4()),
+                request_id=session_id,
                 prompt_ids=prompt_ids,
                 sampling_params={**sampling_params, "logprobs": sampling_params.get("logprobs", True)},
             )
