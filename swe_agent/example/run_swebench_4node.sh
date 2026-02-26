@@ -3,16 +3,16 @@
 # SWE-bench VERL Training - Multi-Node
 #
 # Thin wrapper: sets multi-node defaults, then delegates to run_swebench.sh.
-# Default topology: 152 (head) + 154 (worker), 8 GPUs each = 16 GPUs.
+# Default topology: head + 1 worker, 8 GPUs each = 16 GPUs.
 #
 # Prerequisites:
 #   1. Start Ray cluster (see below — this script does it automatically)
 #   2. Prepare data: see run_swebench.sh header
 #
 # Usage:
-#   bash run_swebench_4node.sh                         # 2-node, 16 GPU
+#   HEAD_IP=<head> WORKER_IPS_STR=<w1> bash run_swebench_4node.sh
 #   bash run_swebench_4node.sh trainer.total_epochs=5  # Hydra overrides pass through
-#   NNODES=4 WORKER_IPS="8.92.9.150,8.92.9.154,8.92.9.155" bash run_swebench_4node.sh
+#   NNODES=4 WORKER_IPS_STR="<w1> <w2> <w3>" bash run_swebench_4node.sh
 # =============================================================================
 
 set -euo pipefail
@@ -20,10 +20,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ================= Cluster topology =================
-HEAD_IP=${MASTER_ADDR:-8.92.9.152}
-WORKER_IPS_STR=${WORKER_IPS:-"8.92.9.154"}
-IFS=',' read -ra WORKER_IP_LIST <<< "$WORKER_IPS_STR"
-SSH_PORT=${SSH_PORT:-1314}
+HEAD_IP=${MASTER_ADDR:?"MASTER_ADDR must be set (e.g. export MASTER_ADDR=192.168.1.100)"}
+WORKER_IPS_STR=${WORKER_IPS_STR:?"WORKER_IPS_STR must be set (space-separated IPs, e.g. '192.168.1.101 192.168.1.102')"}
+IFS=' ' read -ra WORKER_IP_LIST <<< "$WORKER_IPS_STR"
+SSH_PORT=${SSH_PORT:-22}
 
 NUM_WORKERS=${#WORKER_IP_LIST[@]}
 TOTAL_NODES=$(( NUM_WORKERS + 1 ))
@@ -48,7 +48,7 @@ export RAY_ADDRESS=${RAY_ADDRESS:-auto}
 
 export DATA_DIR=${DATA_DIR:-$(cd "$SCRIPT_DIR/../../.." && pwd)/data/swe_bench_small}
 
-WORK_BASE=${WORK_BASE:-/data1/lmy/workspace}
+WORK_BASE=${WORK_BASE:-$HOME/workspace}
 RAY_TMPDIR=$WORK_BASE/ray_tmp
 RAY_PORT=6379
 

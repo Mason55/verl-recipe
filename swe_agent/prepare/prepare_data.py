@@ -116,7 +116,9 @@ _SIMPLE_CASES_TRAIN = [
         ),
     },
     {
-        "problem_statement": "Add a docstring to the function greet in greet.py. The docstring should say 'Return a greeting message.'",
+        "problem_statement": (
+            "Add a docstring to the function greet in greet.py. The docstring should say 'Return a greeting message.'"
+        ),
         "repo_content": {"greet.py": 'def greet(name):\n    return f"Hello, {name}!"'},
         "expected_patch": (
             "diff --git a/greet.py b/greet.py\n"
@@ -129,7 +131,9 @@ _SIMPLE_CASES_TRAIN = [
         ),
     },
     {
-        "problem_statement": "Fix the off-by-one error in range.py: the loop should print numbers from 1 to 5 inclusive, not 1 to 4",
+        "problem_statement": (
+            "Fix the off-by-one error in range.py: the loop should print numbers from 1 to 5 inclusive, not 1 to 4"
+        ),
         "repo_content": {"range.py": "for i in range(1, 5):\n    print(i)"},
         "expected_patch": (
             "diff --git a/range.py b/range.py\n"
@@ -142,7 +146,7 @@ _SIMPLE_CASES_TRAIN = [
         ),
     },
     {
-        "problem_statement": "Create a file called config.json with the content: {\"debug\": true, \"version\": 1}",
+        "problem_statement": 'Create a file called config.json with the content: {"debug": true, "version": 1}',
         "repo_content": {},
         "expected_patch": (
             "diff --git a/config.json b/config.json\n"
@@ -154,8 +158,12 @@ _SIMPLE_CASES_TRAIN = [
         ),
     },
     {
-        "problem_statement": "In math_utils.py, the multiply function incorrectly uses addition. Fix it to use multiplication.",
-        "repo_content": {"math_utils.py": "def multiply(a, b):\n    return a + b\n\ndef divide(a, b):\n    return a / b"},
+        "problem_statement": (
+            "In math_utils.py, the multiply function incorrectly uses addition. Fix it to use multiplication."
+        ),
+        "repo_content": {
+            "math_utils.py": "def multiply(a, b):\n    return a + b\n\ndef divide(a, b):\n    return a / b"
+        },
         "expected_patch": (
             "diff --git a/math_utils.py b/math_utils.py\n"
             "--- a/math_utils.py\n"
@@ -220,6 +228,228 @@ _SIMPLE_CASES_TRAIN = [
     },
 ]
 
+_SIMPLE_CASES_TRAIN_HARD = [
+    {
+        "problem_statement": (
+            "The function `parse_csv` in `parser.py` crashes on empty input. "
+            "Fix it to return an empty list when the input string is empty or None."
+        ),
+        "repo_content": {
+            "parser.py": (
+                "def parse_csv(text):\n"
+                "    rows = []\n"
+                "    for line in text.strip().split('\\n'):\n"
+                "        rows.append(line.split(','))\n"
+                "    return rows\n"
+            )
+        },
+        "expected_patch": (
+            "diff --git a/parser.py b/parser.py\n"
+            "--- a/parser.py\n"
+            "+++ b/parser.py\n"
+            "@@ -1,5 +1,7 @@\n"
+            " def parse_csv(text):\n"
+            "+    if not text:\n"
+            "+        return []\n"
+            "     rows = []\n"
+            "     for line in text.strip().split('\\n'):\n"
+            "         rows.append(line.split(','))\n"
+            "     return rows"
+        ),
+    },
+    {
+        "problem_statement": (
+            "In `utils.py`, the `flatten` function only handles one level of nesting. "
+            "Fix it to recursively flatten arbitrarily nested lists."
+        ),
+        "repo_content": {
+            "utils.py": (
+                "def flatten(lst):\n"
+                "    result = []\n"
+                "    for item in lst:\n"
+                "        if isinstance(item, list):\n"
+                "            result.extend(item)\n"
+                "        else:\n"
+                "            result.append(item)\n"
+                "    return result\n"
+            )
+        },
+        "expected_patch": (
+            "diff --git a/utils.py b/utils.py\n"
+            "--- a/utils.py\n"
+            "+++ b/utils.py\n"
+            "@@ -3,7 +3,7 @@\n"
+            "     for item in lst:\n"
+            "         if isinstance(item, list):\n"
+            "-            result.extend(item)\n"
+            "+            result.extend(flatten(item))\n"
+            "         else:\n"
+            "             result.append(item)\n"
+            "     return result"
+        ),
+    },
+    {
+        "problem_statement": (
+            "Add a `__repr__` method to the `Point` class in `geometry.py` that returns 'Point(x=<x>, y=<y>)' format."
+        ),
+        "repo_content": {
+            "geometry.py": (
+                "class Point:\n"
+                "    def __init__(self, x, y):\n"
+                "        self.x = x\n"
+                "        self.y = y\n"
+                "\n"
+                "    def distance(self, other):\n"
+                "        return ((self.x - other.x)**2 + (self.y - other.y)**2)**0.5\n"
+            )
+        },
+        "expected_patch": (
+            "diff --git a/geometry.py b/geometry.py\n"
+            "--- a/geometry.py\n"
+            "+++ b/geometry.py\n"
+            "@@ -4,4 +4,7 @@\n"
+            "         self.y = y\n"
+            " \n"
+            "+    def __repr__(self):\n"
+            "+        return f'Point(x={self.x}, y={self.y})'\n"
+            "+\n"
+            "     def distance(self, other):\n"
+            "         return ((self.x - other.x)**2 + (self.y - other.y)**2)**0.5"
+        ),
+    },
+    {
+        "problem_statement": (
+            "The `is_palindrome` function in `strings.py` is case-sensitive. "
+            "Fix it to be case-insensitive and also ignore spaces."
+        ),
+        "repo_content": {"strings.py": ("def is_palindrome(s):\n    return s == s[::-1]\n")},
+        "expected_patch": (
+            "diff --git a/strings.py b/strings.py\n"
+            "--- a/strings.py\n"
+            "+++ b/strings.py\n"
+            "@@ -1,2 +1,3 @@\n"
+            " def is_palindrome(s):\n"
+            "-    return s == s[::-1]\n"
+            "+    s = s.lower().replace(' ', '')\n"
+            "+    return s == s[::-1]"
+        ),
+    },
+    {
+        "problem_statement": (
+            "In `app.py`, the `read_config` function does not handle the case where the "
+            "config file does not exist. Add a try/except that returns an empty dict if "
+            "FileNotFoundError is raised."
+        ),
+        "repo_content": {
+            "app.py": (
+                "import json\n\ndef read_config(path):\n    with open(path) as f:\n        return json.load(f)\n"
+            )
+        },
+        "expected_patch": (
+            "diff --git a/app.py b/app.py\n"
+            "--- a/app.py\n"
+            "+++ b/app.py\n"
+            "@@ -2,4 +2,7 @@\n"
+            " \n"
+            " def read_config(path):\n"
+            "-    with open(path) as f:\n"
+            "-        return json.load(f)\n"
+            "+    try:\n"
+            "+        with open(path) as f:\n"
+            "+            return json.load(f)\n"
+            "+    except FileNotFoundError:\n"
+            "+        return {}"
+        ),
+    },
+    {
+        "problem_statement": (
+            "The `Stack` class in `stack.py` is missing a `peek` method. Add a `peek` method "
+            "that returns the top element without removing it, or raises IndexError if empty."
+        ),
+        "repo_content": {
+            "stack.py": (
+                "class Stack:\n"
+                "    def __init__(self):\n"
+                "        self._items = []\n"
+                "\n"
+                "    def push(self, item):\n"
+                "        self._items.append(item)\n"
+                "\n"
+                "    def pop(self):\n"
+                "        return self._items.pop()\n"
+                "\n"
+                "    def is_empty(self):\n"
+                "        return len(self._items) == 0\n"
+            )
+        },
+        "expected_patch": (
+            "diff --git a/stack.py b/stack.py\n"
+            "--- a/stack.py\n"
+            "+++ b/stack.py\n"
+            "@@ -9,4 +9,9 @@\n"
+            "     def pop(self):\n"
+            "         return self._items.pop()\n"
+            " \n"
+            "+    def peek(self):\n"
+            "+        if self.is_empty():\n"
+            "+            raise IndexError('peek from empty stack')\n"
+            "+        return self._items[-1]\n"
+            "+\n"
+            "     def is_empty(self):\n"
+            "         return len(self._items) == 0"
+        ),
+    },
+    {
+        "problem_statement": (
+            "In `validators.py`, the `validate_email` function only checks for '@'. "
+            "Fix it to also require at least one '.' after the '@'."
+        ),
+        "repo_content": {"validators.py": ("def validate_email(email):\n    return '@' in email\n")},
+        "expected_patch": (
+            "diff --git a/validators.py b/validators.py\n"
+            "--- a/validators.py\n"
+            "+++ b/validators.py\n"
+            "@@ -1,2 +1,4 @@\n"
+            " def validate_email(email):\n"
+            "-    return '@' in email\n"
+            "+    if '@' not in email:\n"
+            "+        return False\n"
+            "+    return '.' in email.split('@')[1]"
+        ),
+    },
+    {
+        "problem_statement": (
+            "The `counter.py` module has a global counter but no `reset` function. "
+            "Add a `reset()` function that sets the counter back to 0."
+        ),
+        "repo_content": {
+            "counter.py": (
+                "count = 0\n"
+                "\n"
+                "def increment():\n"
+                "    global count\n"
+                "    count += 1\n"
+                "\n"
+                "def get_count():\n"
+                "    return count\n"
+            )
+        },
+        "expected_patch": (
+            "diff --git a/counter.py b/counter.py\n"
+            "--- a/counter.py\n"
+            "+++ b/counter.py\n"
+            "@@ -6,3 +6,7 @@\n"
+            " \n"
+            " def get_count():\n"
+            "     return count\n"
+            "+\n"
+            "+def reset():\n"
+            "+    global count\n"
+            "+    count = 0"
+        ),
+    },
+]
+
 _SIMPLE_CASES_VAL = [
     {
         "problem_statement": "Rename the file report.txt to summary.txt",
@@ -268,6 +498,77 @@ _SIMPLE_CASES_VAL = [
             "-DEBUG: old log entries"
         ),
     },
+    {
+        "problem_statement": (
+            "The `clamp` function in `math_helpers.py` should restrict a value to be "
+            "between `lo` and `hi`. Currently it returns `value` unchanged. Fix it."
+        ),
+        "repo_content": {"math_helpers.py": ("def clamp(value, lo, hi):\n    return value\n")},
+        "expected_patch": (
+            "diff --git a/math_helpers.py b/math_helpers.py\n"
+            "--- a/math_helpers.py\n"
+            "+++ b/math_helpers.py\n"
+            "@@ -1,2 +1,2 @@\n"
+            " def clamp(value, lo, hi):\n"
+            "-    return value\n"
+            "+    return max(lo, min(hi, value))"
+        ),
+    },
+    {
+        "problem_statement": (
+            "Add a `to_dict` method to the `User` class in `models.py` that returns "
+            "{'name': self.name, 'age': self.age}."
+        ),
+        "repo_content": {
+            "models.py": (
+                "class User:\n    def __init__(self, name, age):\n        self.name = name\n        self.age = age\n"
+            )
+        },
+        "expected_patch": (
+            "diff --git a/models.py b/models.py\n"
+            "--- a/models.py\n"
+            "+++ b/models.py\n"
+            "@@ -3,1 +3,4 @@\n"
+            "         self.name = name\n"
+            "         self.age = age\n"
+            "+\n"
+            "+    def to_dict(self):\n"
+            "+        return {'name': self.name, 'age': self.age}"
+        ),
+    },
+    {
+        "problem_statement": (
+            "In `text.py`, the `word_count` function splits only on spaces. "
+            "Fix it to split on any whitespace (tabs, newlines, multiple spaces)."
+        ),
+        "repo_content": {"text.py": ("def word_count(text):\n    return len(text.split(' '))\n")},
+        "expected_patch": (
+            "diff --git a/text.py b/text.py\n"
+            "--- a/text.py\n"
+            "+++ b/text.py\n"
+            "@@ -1,2 +1,2 @@\n"
+            " def word_count(text):\n"
+            "-    return len(text.split(' '))\n"
+            "+    return len(text.split())"
+        ),
+    },
+    {
+        "problem_statement": (
+            "The `safe_divide` function in `calc.py` does not handle division by zero. "
+            "Fix it to return 0.0 when the divisor is zero."
+        ),
+        "repo_content": {"calc.py": ("def safe_divide(a, b):\n    return a / b\n")},
+        "expected_patch": (
+            "diff --git a/calc.py b/calc.py\n"
+            "--- a/calc.py\n"
+            "+++ b/calc.py\n"
+            "@@ -1,2 +1,4 @@\n"
+            " def safe_divide(a, b):\n"
+            "+    if b == 0:\n"
+            "+        return 0.0\n"
+            "     return a / b"
+        ),
+    },
 ]
 
 
@@ -279,8 +580,12 @@ def generate_simple_test_data(
     """Generate simple test data for quick validation.
 
     Train and validation use completely disjoint problem pools.
+    Training pool includes both easy and harder cases.
     """
-    pool = _SIMPLE_CASES_TRAIN if split == "train" else _SIMPLE_CASES_VAL
+    if split == "train":
+        pool = _SIMPLE_CASES_TRAIN + _SIMPLE_CASES_TRAIN_HARD
+    else:
+        pool = _SIMPLE_CASES_VAL
 
     rows: list[dict[str, Any]] = []
     for idx in range(num_samples):

@@ -128,7 +128,7 @@ class SWEAgentLoop(AgentLoopBase):
                 try:
                     fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
                     os.ftruncate(fd, 0)
-                    os.write(fd, f"pid={os.getpid()}\n".encode("utf-8"))
+                    os.write(fd, f"pid={os.getpid()}\n".encode())
                     return fd, slot_idx
                 except BlockingIOError:
                     os.close(fd)

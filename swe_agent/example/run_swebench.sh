@@ -25,7 +25,7 @@
 set -xeuo pipefail
 
 # ================= Work directories =================
-WORK_BASE=${WORK_BASE:-/data1/lmy/workspace}
+WORK_BASE=${WORK_BASE:-$HOME/workspace}
 export TMPDIR=$WORK_BASE/tmp  TEMP=$WORK_BASE/tmp  TMP=$WORK_BASE/tmp
 export RAY_TMPDIR=$WORK_BASE/ray_tmp
 export TRITON_CACHE_DIR=$WORK_BASE/triton_cache
@@ -44,7 +44,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RECIPE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 VERL_ROOT="$(cd "$RECIPE_DIR/../.." && pwd)"
 
-model_path=${MODEL_PATH:-/data1/models/Qwen/Qwen3-4B-Instruct-2507}
+model_path=${MODEL_PATH:-/path/to/model}
 
 # ================= Data =================
 DATA_DIR=${DATA_DIR:-$VERL_ROOT/data/swe_bench}
@@ -111,7 +111,7 @@ if [ "$NNODES" -gt 1 ]; then
     export NCCL_SOCKET_IFNAME=${NCCL_SOCKET_IFNAME:-enp96s0f0}
     export GLOO_SOCKET_IFNAME=${GLOO_SOCKET_IFNAME:-enp96s0f0}
     export TP_SOCKET_IFNAME=${TP_SOCKET_IFNAME:-enp96s0f0}
-    export MASTER_ADDR=${MASTER_ADDR:-8.92.9.152}
+    export MASTER_ADDR=${MASTER_ADDR:?"MASTER_ADDR must be set for multi-node (e.g. export MASTER_ADDR=192.168.1.100)"}
     export RAY_ADDRESS=${RAY_ADDRESS:-auto}
 else
     unset NCCL_SHM_DISABLE 2>/dev/null || true

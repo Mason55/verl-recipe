@@ -11,7 +11,7 @@
 #
 # Key hyperparameters (override via environment or Hydra CLI):
 #   MODEL_PATH       Model directory         (default: Qwen3-4B-Instruct-2507)
-#   WORK_BASE        Workspace root          (default: /data1/lmy/workspace)
+#   WORK_BASE        Workspace root          (default: ~/workspace)
 #   TRAIN_BATCH_SIZE Prompts per rollout      (default: 8)
 #   GPUS_PER_NODE    Number of GPUs           (default: 8)
 # =============================================================================
@@ -19,7 +19,7 @@
 set -xeuo pipefail
 
 # ================= Work directories =================
-WORK_BASE=${WORK_BASE:-/data1/lmy/workspace}
+WORK_BASE=${WORK_BASE:-$HOME/workspace}
 export TMPDIR=$WORK_BASE/tmp  TEMP=$WORK_BASE/tmp  TMP=$WORK_BASE/tmp
 export RAY_TMPDIR=$WORK_BASE/ray_tmp
 export TRITON_CACHE_DIR=$WORK_BASE/triton_cache
@@ -38,7 +38,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RECIPE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 VERL_ROOT="$(cd "$RECIPE_DIR/../.." && pwd)"
 
-model_path=${MODEL_PATH:-/data1/models/Qwen/Qwen3-4B-Instruct-2507}
+model_path=${MODEL_PATH:-/path/to/model}
 
 # ================= Data =================
 DATA_DIR=$VERL_ROOT/data/swe_agent_test

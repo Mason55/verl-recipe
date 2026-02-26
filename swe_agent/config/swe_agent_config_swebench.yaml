@@ -32,10 +32,6 @@
     docker_memory_limit: 8g
     docker_startup_timeout: 600.0  # SWE-bench eval images need pipx install of swe-rex (slow first run)
     docker_remove_container: true
-    ## 如果是裸金属就注释掉下面的 如果是docker-in-docker就打开
-    # docker_internal_host: "http://host.docker.internal"
-    ## docker-in-docker环境下docker用host网络模式，端口映射不生效，需设为host
-    # docker_network: "host"
     # --- Data-affine fields ---
     # [DATA-AFFINE] Max model call count
     max_steps: 30
@@ -44,8 +40,7 @@
     # [DATA-AFFINE] Default Docker image — overridden per-instance for SWE-bench
     # Each SWE-bench instance uses sweb.eval.x86_64.<repo>-<id> image
     # This default is used only as fallback
-    # docker_image: swerex-python:3.11-preinstalled
-    docker_image: swebenchdocker.tencentcloudcr.com/swerex/swerex-python:3.11-preinstalled
+    docker_image: swerex-python:3.11-preinstalled
 
   # Agent config
   agent:

@@ -3,20 +3,21 @@
 # Setup 4-node Ray cluster for SWE-Agent VERL Training
 # =============================================================================
 # Topology:
-#   HEAD:    8.92.9.152 (Ray head + Dashboard :8265)
-#   WORKER1: 8.92.9.150 (via SSH port 1314, docker: lmy_rl)
-#   WORKER2: 8.92.9.154 (via SSH port 1314, docker: lmy_rl)
-#   WORKER3: 8.92.9.155 (via SSH port 1314, docker: lmy_rl)
+#   HEAD:    <HEAD_IP>    (Ray head + Dashboard :8265)
+#   WORKER1: <WORKER_IP_1> (via SSH)
+#   WORKER2: <WORKER_IP_2> (via SSH)
+#   WORKER3: <WORKER_IP_3> (via SSH)
 # =============================================================================
 set -euo pipefail
 
-HEAD_IP="8.92.9.152"
-WORKER_IPS=("8.92.9.150" "8.92.9.154" "8.92.9.155")
-SSH_PORT=1314
+HEAD_IP=${HEAD_IP:?"HEAD_IP must be set (e.g. export HEAD_IP=192.168.1.100)"}
+# shellcheck disable=SC2206
+WORKER_IPS=(${WORKER_IPS_STR:?"WORKER_IPS_STR must be set (space-separated IPs, e.g. '192.168.1.101 192.168.1.102')"})
+SSH_PORT=${SSH_PORT:-22}
 RAY_PORT=6379
 DASHBOARD_PORT=8265
 
-WORK_BASE=${WORK_BASE:-/data1/lmy/workspace}
+WORK_BASE=${WORK_BASE:-$HOME/workspace}
 RAY_TMPDIR=$WORK_BASE/ray_tmp
 
 log() { echo "[$(date '+%H:%M:%S')] $1"; }

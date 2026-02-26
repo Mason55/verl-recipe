@@ -206,15 +206,15 @@ bash recipe/swe_agent/example/stop_ray_cluster.sh
 ### 3. Monitor Training
 
 ```bash
-# Ray dashboard (if running on head node 8.92.9.152)
-# http://8.92.9.152:8265
+# Ray dashboard (available on head node)
+# http://<HEAD_IP>:8265
 
 # Metrics JSONL (for run_simple_test.sh)
-tail -f /data1/lmy/workspace/logs/qwen3-4b-simple-v1_metrics.jsonl
+tail -f ~/workspace/logs/qwen3-4b-simple-v1_metrics.jsonl
 
 # Inspect trajectories
-ls /data1/lmy/workspace/trajectories/qwen3-4b-simple-v1/rollout/
-ls /data1/lmy/workspace/trajectories/qwen3-4b-simple-v1/validation/
+ls ~/workspace/trajectories/qwen3-4b-simple-v1/rollout/
+ls ~/workspace/trajectories/qwen3-4b-simple-v1/validation/
 ```
 
 ## Training Scripts

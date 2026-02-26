@@ -4,11 +4,10 @@
 # =============================================================================
 set -euo pipefail
 
-# HEAD_IP="8.92.9.152"
-# WORKER_IPS=("8.92.9.150" "8.92.9.154" "8.92.9.155")
-HEAD_IP="10.16.2.104"
-WORKER_IPS=("")
-SSH_PORT=1314
+HEAD_IP=${HEAD_IP:?"HEAD_IP must be set (e.g. export HEAD_IP=192.168.1.100)"}
+# shellcheck disable=SC2206
+WORKER_IPS=(${WORKER_IPS_STR:?"WORKER_IPS_STR must be set (space-separated IPs)"})
+SSH_PORT=${SSH_PORT:-22}
 
 log() { echo "[$(date '+%H:%M:%S')] $1"; }
 

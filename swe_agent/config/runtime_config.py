@@ -86,7 +86,7 @@ _DEFAULT_TEMPLATES: dict[str, Any] = {
         "1. Explore the repo with `ls` and `cat` to understand the code\n"
         "2. Make the required changes using `str_replace_editor` or bash commands\n"
         "   - `str_replace_editor` requires positional args: <command> <path> (no --path flag)\n"
-        "   - Example: str_replace_editor str_replace /testbed/file.py --old_str \"<exact old>\" --new_str \"<new>\"\n"
+        '   - Example: str_replace_editor str_replace /testbed/file.py --old_str "<exact old>" --new_str "<new>"\n'
         "   - Quote arguments carefully when strings contain spaces or newlines\n"
         "3. Verify your changes work\n"
         "4. Run `submit` to submit your patch\n\n"
@@ -129,8 +129,7 @@ def _validate_sandbox_config(sandbox_config: dict[str, Any]) -> None:
     max_parallel_tasks = sandbox_config.get("max_parallel_tasks_per_worker")
     if max_parallel_tasks is not None and (not isinstance(max_parallel_tasks, int) or max_parallel_tasks < 0):
         raise ConfigValidationError(
-            "sandbox_config.max_parallel_tasks_per_worker must be a non-negative integer, "
-            f"got: {max_parallel_tasks}"
+            f"sandbox_config.max_parallel_tasks_per_worker must be a non-negative integer, got: {max_parallel_tasks}"
         )
 
 
